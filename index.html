@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Text to Handwriting (A4 Image with Background)</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Gloria+Hallelujah&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f4;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+
+        .container {
+            text-align: center;
+            background: #fff;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            width: 80%;
+            max-width: 600px;
+        }
+
+        textarea {
+            width: 100%;
+            height: 200px;
+            font-family: 'Gloria Hallelujah', cursive;
+            font-size: 16px;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            resize: none;
+        }
+
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            background-color: #007BFF;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background-color: #0056b3;
+        }
+
+        .dropdown {
+            position: relative;
+            display: inline-block;
+            width: 100%;
+            margin: 10px 0;
+        }
+
+        .dropdown-selected {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            padding: 10px;
+            cursor: pointer;
+            background: #f9f9f9;
+        }
+
+        .dropdown-selected::after {
+            content: '\25BC';
+            font-size: 16px;
+            color: #666;
+        }
+
+        .dropdown-options {
+            display: none;
+            position: absolute;
+            top: 100%;
+            left: 0;
+            width: 100%;
+            background: #fff;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            z-index: 1000;
+        }
+
+        .dropdown-option {
+            display: flex;
+            align-items: center;
+            padding: 10px;
+            cursor: pointer;
+        }
+
+        .dropdown-option img {
+            width: 40px;
+            height: 40px;
+            margin-right: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+
+        .dropdown-option:hover {
+            background: #f4f4f4;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Text to Handwriting</h1>
+        <textarea id="textInput" placeholder="Type your text here..."></textarea>
+        <div class="dropdown">
+            <div class="dropdown-selected" id="dropdownSelected">
+                <span id="selectedText">Select Paper Type</span>
+            </div>
+            <div class="dropdown-options" id="dropdownOptions">
+                <div class="dropdown-option" data-value="white" data-text="White Paper">
+                    <img src="https://static.wixstatic.com/media/5c0589_a5fb35e1563e429eb7290a02665f1168~mv2.png" alt="White Paper">
+                    <span>White Paper</span>
+                </div>
+                <div class="dropdown-option" data-value="lined" data-text="Lined Paper">
+                    <img src="https://static.wixstatic.com/media/5c0589_a06baf112bde476aad6351dd339da4e1~mv2.png" alt="Lined Paper">
+                    <span>Lined Paper</span>
+                </div>
+                <div class="dropdown-option" data-value="grid" data-text="Grid Paper">
+                    <img src="https://static.wixstatic.com/media/5c0589_55510ade78fb449f8604fd572434996a~mv2.png" alt="Grid Paper">
+                    <span>Grid Paper</span>
+                </div>
+            </div>
+        </div>
+        <button onclick="generateImage()">Download as Image</button>
+    </div>
+
+    <canvas id="textCanvas" style="display:none;"></canvas>
+
+    <script>
+        const dropdownSelected = document.getElementById('dropdownSelected');
+        const dropdownOptions = document.getElementById('dropdownOptions');
+        const selectedText = document.getElementById('selectedText');
+        const canvas = document.getElementById('textCanvas');
+        const ctx = canvas.getContext('2d');
+
+        dropdownSelected.addEventListener('click', () => {
+            dropdownOptions.style.display = dropdownOptions.style.display === 'block' ? 'none' : 'block';
+        });
+
+        document.querySelectorAll('.dropdown-option').forEach(option => {
+            option.addEventListener('click', () => {
+                const value = option.getAttribute('data-value');
+                const text = option.getAttribute('data-text');
+                selectedText.textContent = text;
+                dropdownSelected.dataset.value = value;
+                dropdownOptions.style.display = 'none';
+            });
+        });
+
+        function generateImage() {
+            const text = document.getElementById('textInput').value;
+            const paperType = dropdownSelected.dataset.value || 'white';
+            const lineHeight = 70; // Line spacing
+            const margin = 100; // Margins on the page
+            const maxWidth = 2480 - margin * 2; // Max width for text on A4 page
+            const maxLinesPerPage = Math.floor((3508 - margin * 2) / lineHeight); // Lines that fit on one page
+
+            const paragraphs = text.split('\n');
+            let linesToRender = [];
+            paragraphs.forEach(paragraph => {
+                const lines = wrapText(ctx, paragraph, maxWidth);
+                linesToRender.push(...lines);
+            });
+
+            let currentLine = 0;
+            let page = 1;
+
+            while (currentLine < linesToRender.length) {
+                canvas.width = 2480; // A4 Width
+                canvas.height = 3508; // A4 Height
+
+                if (paperType === 'lined') {
+                    drawLinedBackground();
+                } else if (paperType === 'grid') {
+                    drawGridBackground();
+                } else {
+                    drawWhiteBackground();
+                }
+
+                ctx.font = "50px 'Gloria Hallelujah'";
+                ctx.fillStyle = "#000";
+                let cursorY = margin;
+
+                for (let i = 0; i < maxLinesPerPage && currentLine < linesToRender.length; i++, currentLine++) {
+                    ctx.fillText(linesToRender[currentLine], margin, cursorY);
+                    cursorY += lineHeight;
+                }
+
+                const link = document.createElement('a');
+                link.download = `handwriting-a4-page-${page}.png`;
+                link.href = canvas.toDataURL();
+                link.click();
+
+                page++;
+            }
+        }
+
+        function drawWhiteBackground() {
+            ctx.fillStyle = '#fff';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+        }
+
+        function drawLinedBackground() {
+            drawWhiteBackground();
+            ctx.strokeStyle = '#c0c0c0';
+            const lineSpacing = 70;
+            for (let y = 100; y < canvas.height; y += lineSpacing) {
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(canvas.width, y);
+                ctx.stroke();
+            }
+        }
+
+        function drawGridBackground() {
+            drawWhiteBackground();
+            ctx.strokeStyle = '#c0c0c0';
+            const gridSpacing = 70;
+
+            for (let y = 0; y < canvas.height; y += gridSpacing) {
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(canvas.width, y);
+                ctx.stroke();
+            }
+
+            for (let x = 0; x < canvas.width; x += gridSpacing) {
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, canvas.height);
+                ctx.stroke();
+            }
+        }
+
+        function wrapText(ctx, text, maxWidth) {
+            const words = text.split(' ');
+            const lines = [];
+            let line = '';
+
+            words.forEach(word => {
+                const testLine = line + word + ' ';
+                const testWidth = ctx.measureText(testLine).width;
+
+                if (testWidth > maxWidth) {
+                    lines.push(line.trim());
+                    line = word + ' ';
+                } else {
+                    line = testLine;
+                }
+            });
+
+            if (line) lines.push(line.trim());
+            return lines;
+        }
+    </script>
+</body>
+</html>
