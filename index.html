@@ -3,10 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Text to Handwriting (A4 Image with Background)</title>
+    <title>Text to Handwriting (A4 Image with Preview)</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Gloria+Hallelujah&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -109,6 +110,56 @@
         .dropdown-option:hover {
             background: #f4f4f4;
         }
+
+        .preview-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            justify-content: center;
+            align-items: center;
+            z-index: 2000;
+        }
+
+        .preview-content {
+            position: relative;
+            background: white;
+            padding: 20px;
+            border-radius: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            width: 90%;
+            max-width: 400px;
+            aspect-ratio: 8.5 / 11;
+            overflow: hidden;
+        }
+
+        .preview-close {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: #ff4d4d;
+            color: white;
+            border: none;
+            border-radius: 10px;
+            width: 40px;
+            height: 40px;
+            cursor: pointer;
+            font-size: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        canvas {
+            display: block;
+            margin: auto;
+            border-radius: 10px;
+            width: 100%;
+            height: auto;
+        }
     </style>
 </head>
 <body>
@@ -134,7 +185,15 @@
                 </div>
             </div>
         </div>
+        <button onclick="previewImage()">Preview</button>
         <button onclick="generateImage()">Download as Image</button>
+    </div>
+
+    <div class="preview-overlay" id="previewOverlay">
+        <div class="preview-content">
+            <button class="preview-close" onclick="closePreview()">&times;</button>
+            <canvas id="previewCanvas"></canvas>
+        </div>
     </div>
 
     <canvas id="textCanvas" style="display:none;"></canvas>
@@ -144,7 +203,10 @@
         const dropdownOptions = document.getElementById('dropdownOptions');
         const selectedText = document.getElementById('selectedText');
         const canvas = document.getElementById('textCanvas');
+        const previewCanvas = document.getElementById('previewCanvas');
+        const previewOverlay = document.getElementById('previewOverlay');
         const ctx = canvas.getContext('2d');
+        const previewCtx = previewCanvas.getContext('2d');
 
         dropdownSelected.addEventListener('click', () => {
             dropdownOptions.style.display = dropdownOptions.style.display === 'block' ? 'none' : 'block';
@@ -160,61 +222,69 @@
             });
         });
 
-        function generateImage() {
-            const text = document.getElementById('textInput').value;
-            const paperType = dropdownSelected.dataset.value || 'white';
-            const lineHeight = 70; // Line spacing
-            const margin = 100; // Margins on the page
-            const maxWidth = 2480 - margin * 2; // Max width for text on A4 page
-            const maxLinesPerPage = Math.floor((3508 - margin * 2) / lineHeight); // Lines that fit on one page
-
-            const paragraphs = text.split('\n');
-            let linesToRender = [];
-            paragraphs.forEach(paragraph => {
-                const lines = wrapText(ctx, paragraph, maxWidth);
-                linesToRender.push(...lines);
+        function previewImage() {
+            generateHandwritingImage(previewCanvas, previewCtx, () => {
+                previewOverlay.style.display = 'flex';
+                launchConfetti(); // Trigger confetti on preview
             });
-
-            let currentLine = 0;
-            let page = 1;
-
-            while (currentLine < linesToRender.length) {
-                canvas.width = 2480; // A4 Width
-                canvas.height = 3508; // A4 Height
-
-                if (paperType === 'lined') {
-                    drawLinedBackground();
-                } else if (paperType === 'grid') {
-                    drawGridBackground();
-                } else {
-                    drawWhiteBackground();
-                }
-
-                ctx.font = "50px 'Gloria Hallelujah'";
-                ctx.fillStyle = "#000";
-                let cursorY = margin;
-
-                for (let i = 0; i < maxLinesPerPage && currentLine < linesToRender.length; i++, currentLine++) {
-                    ctx.fillText(linesToRender[currentLine], margin, cursorY);
-                    cursorY += lineHeight;
-                }
-
-                const link = document.createElement('a');
-                link.download = `handwriting-a4-page-${page}.png`;
-                link.href = canvas.toDataURL();
-                link.click();
-
-                page++;
-            }
         }
 
-        function drawWhiteBackground() {
+        function closePreview() {
+            previewOverlay.style.display = 'none';
+        }
+
+        function generateImage() {
+            document.fonts.ready.then(() => {
+                generateHandwritingImage(canvas, ctx, () => {
+                    const dataURL = canvas.toDataURL("image/png");
+                    const link = document.createElement('a');
+                    link.href = dataURL;
+                    link.download = 'handwriting.png';
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                });
+            });
+        }
+
+        function generateHandwritingImage(targetCanvas, targetCtx, callback) {
+            const text = document.getElementById('textInput').value;
+            const paperType = dropdownSelected.dataset.value || 'white';
+            const lineHeight = 70;
+            const margin = 100;
+            const maxWidth = 2480 - margin * 2;
+
+            targetCanvas.width = 2480;
+            targetCanvas.height = 3508;
+
+            if (paperType === 'lined') {
+                drawLinedBackground(targetCtx, targetCanvas);
+            } else if (paperType === 'grid') {
+                drawGridBackground(targetCtx, targetCanvas);
+            } else {
+                drawWhiteBackground(targetCtx, targetCanvas);
+            }
+
+            targetCtx.font = "50px 'Gloria Hallelujah'";
+            targetCtx.fillStyle = "#000";
+            const lines = wrapText(targetCtx, text, maxWidth);
+            let cursorY = margin;
+
+            lines.forEach(line => {
+                targetCtx.fillText(line, margin, cursorY);
+                cursorY += lineHeight;
+            });
+
+            callback();
+        }
+
+        function drawWhiteBackground(ctx, canvas) {
             ctx.fillStyle = '#fff';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
         }
 
-        function drawLinedBackground() {
-            drawWhiteBackground();
+        function drawLinedBackground(ctx, canvas) {
+            drawWhiteBackground(ctx, canvas);
             ctx.strokeStyle = '#c0c0c0';
             const lineSpacing = 70;
             for (let y = 100; y < canvas.height; y += lineSpacing) {
@@ -225,8 +295,8 @@
             }
         }
 
-        function drawGridBackground() {
-            drawWhiteBackground();
+        function drawGridBackground(ctx, canvas) {
+            drawWhiteBackground(ctx, canvas);
             ctx.strokeStyle = '#c0c0c0';
             const gridSpacing = 70;
 
@@ -264,6 +334,14 @@
 
             if (line) lines.push(line.trim());
             return lines;
+        }
+
+        function launchConfetti() {
+            confetti({
+                particleCount: 100,
+                spread: 70,
+                origin: { y: 0.6 }
+            });
         }
     </script>
 </body>
