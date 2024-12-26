@@ -28,10 +28,13 @@
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
             width: 80%;
             max-width: 600px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
         }
 
         textarea {
-            width: 100%;
+            width: calc(100% - 20px); /* Adjust for padding */
             height: 200px;
             font-family: 'Gloria Hallelujah', cursive;
             font-size: 16px;
@@ -39,6 +42,14 @@
             border: 1px solid #ccc;
             border-radius: 5px;
             resize: none;
+            box-sizing: border-box; /* Include padding and border in the width calculation */
+        }
+
+        select {
+            padding: 10px;
+            font-size: 16px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
         }
 
         button {
@@ -53,62 +64,6 @@
 
         button:hover {
             background-color: #0056b3;
-        }
-
-        .dropdown {
-            position: relative;
-            display: inline-block;
-            width: 100%;
-            margin: 10px 0;
-        }
-
-        .dropdown-selected {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            border: 1px solid #ccc;
-            border-radius: 5px;
-            padding: 10px;
-            cursor: pointer;
-            background: #f9f9f9;
-        }
-
-        .dropdown-selected::after {
-            content: '\25BC';
-            font-size: 16px;
-            color: #666;
-        }
-
-        .dropdown-options {
-            display: none;
-            position: absolute;
-            top: 100%;
-            left: 0;
-            width: 100%;
-            background: #fff;
-            border: 1px solid #ccc;
-            border-radius: 5px;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-            z-index: 1000;
-        }
-
-        .dropdown-option {
-            display: flex;
-            align-items: center;
-            padding: 10px;
-            cursor: pointer;
-        }
-
-        .dropdown-option img {
-            width: 40px;
-            height: 40px;
-            margin-right: 10px;
-            border: 1px solid #ddd;
-            border-radius: 5px;
-        }
-
-        .dropdown-option:hover {
-            background: #f4f4f4;
         }
 
         .preview-overlay {
@@ -166,25 +121,13 @@
     <div class="container">
         <h1>Text to Handwriting</h1>
         <textarea id="textInput" placeholder="Type your text here..."></textarea>
-        <div class="dropdown">
-            <div class="dropdown-selected" id="dropdownSelected">
-                <span id="selectedText">Select Paper Type</span>
-            </div>
-            <div class="dropdown-options" id="dropdownOptions">
-                <div class="dropdown-option" data-value="white" data-text="White Paper">
-                    <img src="https://static.wixstatic.com/media/5c0589_a5fb35e1563e429eb7290a02665f1168~mv2.png" alt="White Paper">
-                    <span>White Paper</span>
-                </div>
-                <div class="dropdown-option" data-value="lined" data-text="Lined Paper">
-                    <img src="https://static.wixstatic.com/media/5c0589_a06baf112bde476aad6351dd339da4e1~mv2.png" alt="Lined Paper">
-                    <span>Lined Paper</span>
-                </div>
-                <div class="dropdown-option" data-value="grid" data-text="Grid Paper">
-                    <img src="https://static.wixstatic.com/media/5c0589_55510ade78fb449f8604fd572434996a~mv2.png" alt="Grid Paper">
-                    <span>Grid Paper</span>
-                </div>
-            </div>
-        </div>
+        <label for="fontSizeSelect">Font Size:</label>
+        <select id="fontSizeSelect">
+            <option value="40">40px</option>
+            <option value="50" selected>50px</option>
+            <option value="60">60px</option>
+            <option value="70">70px</option>
+        </select>
         <button onclick="previewImage()">Preview</button>
         <button onclick="generateImage()">Download as Image</button>
     </div>
@@ -199,28 +142,12 @@
     <canvas id="textCanvas" style="display:none;"></canvas>
 
     <script>
-        const dropdownSelected = document.getElementById('dropdownSelected');
-        const dropdownOptions = document.getElementById('dropdownOptions');
-        const selectedText = document.getElementById('selectedText');
+        const fontSizeSelect = document.getElementById('fontSizeSelect');
         const canvas = document.getElementById('textCanvas');
         const previewCanvas = document.getElementById('previewCanvas');
         const previewOverlay = document.getElementById('previewOverlay');
         const ctx = canvas.getContext('2d');
         const previewCtx = previewCanvas.getContext('2d');
-
-        dropdownSelected.addEventListener('click', () => {
-            dropdownOptions.style.display = dropdownOptions.style.display === 'block' ? 'none' : 'block';
-        });
-
-        document.querySelectorAll('.dropdown-option').forEach(option => {
-            option.addEventListener('click', () => {
-                const value = option.getAttribute('data-value');
-                const text = option.getAttribute('data-text');
-                selectedText.textContent = text;
-                dropdownSelected.dataset.value = value;
-                dropdownOptions.style.display = 'none';
-            });
-        });
 
         function previewImage() {
             generateHandwritingImage(previewCanvas, previewCtx, () => {
@@ -249,23 +176,17 @@
 
         function generateHandwritingImage(targetCanvas, targetCtx, callback) {
             const text = document.getElementById('textInput').value;
-            const paperType = dropdownSelected.dataset.value || 'white';
-            const lineHeight = 70;
+            const fontSize = parseInt(fontSizeSelect.value, 10);
+            const lineHeight = fontSize + 20;
             const margin = 100;
             const maxWidth = 2480 - margin * 2;
 
             targetCanvas.width = 2480;
             targetCanvas.height = 3508;
 
-            if (paperType === 'lined') {
-                drawLinedBackground(targetCtx, targetCanvas);
-            } else if (paperType === 'grid') {
-                drawGridBackground(targetCtx, targetCanvas);
-            } else {
-                drawWhiteBackground(targetCtx, targetCanvas);
-            }
+            drawWhiteBackground(targetCtx, targetCanvas);
 
-            targetCtx.font = "50px 'Gloria Hallelujah'";
+            targetCtx.font = `${fontSize}px 'Gloria Hallelujah'`;
             targetCtx.fillStyle = "#000";
             const lines = wrapText(targetCtx, text, maxWidth);
             let cursorY = margin;
@@ -281,38 +202,6 @@
         function drawWhiteBackground(ctx, canvas) {
             ctx.fillStyle = '#fff';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
-        }
-
-        function drawLinedBackground(ctx, canvas) {
-            drawWhiteBackground(ctx, canvas);
-            ctx.strokeStyle = '#c0c0c0';
-            const lineSpacing = 70;
-            for (let y = 100; y < canvas.height; y += lineSpacing) {
-                ctx.beginPath();
-                ctx.moveTo(0, y);
-                ctx.lineTo(canvas.width, y);
-                ctx.stroke();
-            }
-        }
-
-        function drawGridBackground(ctx, canvas) {
-            drawWhiteBackground(ctx, canvas);
-            ctx.strokeStyle = '#c0c0c0';
-            const gridSpacing = 70;
-
-            for (let y = 0; y < canvas.height; y += gridSpacing) {
-                ctx.beginPath();
-                ctx.moveTo(0, y);
-                ctx.lineTo(canvas.width, y);
-                ctx.stroke();
-            }
-
-            for (let x = 0; x < canvas.width; x += gridSpacing) {
-                ctx.beginPath();
-                ctx.moveTo(x, 0);
-                ctx.lineTo(x, canvas.height);
-                ctx.stroke();
-            }
         }
 
         function wrapText(ctx, text, maxWidth) {
@@ -346,3 +235,4 @@
     </script>
 </body>
 </html>
+
